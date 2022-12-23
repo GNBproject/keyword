@@ -17,6 +17,7 @@ from keybert import KeyBERT
 from scipy import stats
 import io
 from sklearn.feature_extraction.text import TfidfVectorizer
+import sys
 
 # 불용어 처리
 def erase(x):
@@ -205,13 +206,63 @@ def delete_words(x):
     for a in word_list:
         x = x.replace(a, "")
     return x
+  
+# 키워드 후처리 - 자주 등장하거나 너무 적게 등장하는 단어 제거 (추가로 빈도 수 파일이 필요함 따로 만드는 코드 X DB에서 작성)
+def postprocessing(data):
+  count = pd.read_csv("파일명", encoding="utf8", sep=";") #vocab 파일 - 단어와 각 단어의 빈도 수가 저장됨
 
-def main():
-  # 토크나이저 선언 및 데이터 가져오기
-  data = pd.read_csv("가져올 데이터 파일명", sep=";", encoding = "euc kr")
+  word_list = ['조침', '한계령', '염려증', '브라이트너', '학습', '작품', '이론', '작가', '양장본', '교재'] # 빈도 수 6만 이상은 직접 추가
+  words = count[count['counts'] < 15]
+  wordList = words['keyword'].to_list()
+  for x in wordList:
+      word_list.append(x)
+      
+  data['main_keywords'] = data['main_keywords'].apply(delete_words)
+
+get_ipython().system('pip install keybert') # 실행 안 될 시 터미널에 직접 입력
+get_ipython().system('pip install -U sentence-transformers') # 실행 안 될 시 터미널에 직접 입력
+get_ipython().system('pip install konlpy') # 실행 안 될 시 터미널에 직접 입력
+
+#데이터 가져오기
+data = pd.read_csv("1-7.csv", sep=";", encoding = "cp949", error_bad_lines=False) # 파일명 직접 입력
+print(data.columns)
+
+#각 키워드 추출 함수 실행
+preprocessing(data)
+print("preprocessing okey")
+bert(data)
+print("bert okey")
+data = keyword(data)
+print("tfidf okey")
+
+# 메인 키워드와 TF-IDF 키워드 합치기
+kw_list = data['main_keywords'].to_list()
+word_list = data['word'].to_list()
+
+for i in range(len(kw_list)):
+      if kw_list[i].find(word_list[i]) == -1 and word_list[i] != '없음':
+        kw_list[i] = word_list[i] + " " + kw_list[i]
+
+data['main_keywords'] = kw_list
+data.drop(['word'], inplace = True, axis =1)
+  
+data.to_csv("result.csv", encoding="euc kr")
+
+def main(file):
+
+  get_ipython().system('pip install keybert') # 실행 안 될 시 터미널에 직접 입력
+  get_ipython().system('pip install -U sentence-transformers') # 실행 안 될 시 터미널에 직접 입력
+
+  #데이터 가져오기
+  data = pd.read_csv(file, sep=";", encoding = "UTF-8")
+  
+  #각 키워드 추출 함수 실행
   preprocessing(data)
+  print("preprocessing okey")
   bert(data)
+  print("bert okey")
   data = keyword(data)
+  print("tfidf okey")
 
   # 메인 키워드와 TF-IDF 키워드 합치기
   kw_list = data['main_keywords'].to_list()
@@ -223,14 +274,5 @@ def main():
 
   data['main_keywords'] = kw_list
   data.drop(['word'], inplace = True, axis =1)
-
-  # 키워드 후처리 - 자주 등장하거나 너무 적게 등장하는 단어 제거
-  count = pd.read_csv("파일명", encoding="utf8", sep=";") #vocab 파일 - 단어와 각 단어의 빈도 수가 저장됨
-
-  word_list = ['조침', '한계령', '염려증', '브라이트너', '학습', '작품', '이론', '작가', '양장본', '교재'] # 빈도 수 6만 이상은 직접 추가
-  words = count[count['counts'] < 15]
-  wordList = words['keyword'].to_list()
-  for x in wordList:
-      word_list.append(x)
-      
-  data['main_keywords'] = data['main_keywords'].apply(delete_words)
+  
+  data.to_csv("result.csv", encoding="UTF-8")
